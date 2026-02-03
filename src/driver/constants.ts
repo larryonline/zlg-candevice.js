@@ -193,3 +193,9 @@ export const CANFD_MAX_DLEN = 64;
 // CAN 帧最大 DLC 值
 export const CAN_MAX_DLC = 8;
 export const CANFD_MAX_DLC = 15;
+
+// TCP 工作模式 (来自 zlgcan.h)
+export const TCP_WORK_MODE = {
+  TCP_CLIENT: 0,
+  TCP_SERVER: 1,
+} as const;

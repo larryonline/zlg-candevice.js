@@ -5,3 +5,4 @@
  */
 
 export * from './driver';
+export * from './device';

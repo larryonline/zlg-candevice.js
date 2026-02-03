@@ -32,3 +32,10 @@ Thumbs.db
 
 # 文档忽略
 spec/
+
+# HIL 脚本 (包含本地配置)
+scripts/*.sh
+
+
+# 测试脚本
+libs/zlg_canlib/examples

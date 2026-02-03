@@ -16,6 +16,8 @@ import {
   ZcanReceiveData,
   ZcanTransmitFdData,
   ZcanReceiveFdData,
+  BusUsage,
+  ZcanDynamicConfigData,
 } from './types';
 
 /**

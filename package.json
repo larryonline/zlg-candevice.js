@@ -6,6 +6,7 @@
   "types": "dist/index.d.ts",
   "scripts": {
     "build": "tsc",
+    "prepare": "npm run build",
     "test": "mocha",
     "test:unit": "mocha test/unit/**/*.spec.ts",
     "test:hil": "mocha test/hil/**/*.spec.ts"
@@ -17,7 +18,7 @@
     "zlgcan"
   ],
   "author": "",
-  "license": "MIT",
+  "license": "BSD-3-Clause",
   "devDependencies": {
     "@types/chai": "^4.3.11",
     "@types/mocha": "^10.0.6",

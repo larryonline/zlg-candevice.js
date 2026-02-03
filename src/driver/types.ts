@@ -329,3 +329,54 @@ export interface IZcanfdAutoTransmitObj {
   interval: number;
   obj: IZcanTransmitFdData;
 }
+
+// ============================================================================
+// 总线利用率结构体
+// ============================================================================
+
+/**
+ * 总线利用率结构体
+ * 对应 C 结构体 BusUsage
+ */
+export const BusUsage = koffi.struct('BusUsage', {
+  nTimeStampBegin: koffi.types.uint64,  // 测量起始时间戳，单位us
+  nTimeStampEnd: koffi.types.uint64,    // 测量结束时间戳，单位us
+  nChnl: koffi.types.uint8,             // 通道
+  nReserved: koffi.types.uint8,         // 保留
+  nBusUsage: koffi.types.uint16,        // 总线利用率(%)，总线利用率*100展示。取值0~10000，如8050表示80.50%
+  nFrameCount: koffi.types.uint32,      // 帧数量
+});
+
+/**
+ * 总线利用率接口
+ */
+export interface IBusUsage {
+  nTimeStampBegin: bigint | number;     // 测量起始时间戳，单位us
+  nTimeStampEnd: bigint | number;       // 测量结束时间戳，单位us
+  nChnl: number;                        // 通道
+  nReserved: number;                    // 保留
+  nBusUsage: number;                    // 总线利用率(%)，总线利用率*100展示。取值0~10000
+  nFrameCount: number;                  // 帧数量
+}
+
+// ============================================================================
+// 动态配置结构体
+// ============================================================================
+
+/**
+ * 动态配置数据结构体
+ * 对应 C 结构体 ZCAN_DYNAMIC_CONFIG_DATA
+ * 用于设置总线利用率等动态配置
+ */
+export const ZcanDynamicConfigData = koffi.struct('ZCAN_DYNAMIC_CONFIG_DATA', {
+  key: koffi.array(koffi.types.char, 64),    // 配置键名
+  value: koffi.array(koffi.types.char, 64),  // 配置值
+});
+
+/**
+ * 动态配置数据接口
+ */
+export interface IZcanDynamicConfigData {
+  key: string;
+  value: string;
+}

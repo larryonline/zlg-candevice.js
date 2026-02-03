@@ -17,6 +17,8 @@ import {
   ZcanReceiveFdData,
   ZcanAutoTransmitObj,
   ZcanfdAutoTransmitObj,
+  BusUsage,
+  ZcanDynamicConfigData,
   IZcanDeviceInfo,
   IZcanChannelInitConfig,
   IZcanTransmitData,
@@ -25,6 +27,8 @@ import {
   IZcanReceiveFdData,
   IZcanAutoTransmitObj,
   IZcanfdAutoTransmitObj,
+  IBusUsage,
+  IZcanDynamicConfigData,
 } from './types';
 import {
   ZCAN_STATUS,
@@ -32,10 +36,12 @@ import {
   INVALID_CHANNEL_HANDLE,
   ZCAN_DATA_TYPE,
 } from './constants';
+import { ZlgCanError } from './errors';
 
 // 导出所有类型和常量
 export * from './types';
 export * from './constants';
+export * from './errors';
 export { isPlatformSupported, getSystemArch, getDllPath } from './loader';
 
 /**
@@ -80,36 +86,44 @@ export class ZlgCanDriver {
    * 打开设备
    * @param deviceType 设备类型
    * @param deviceIndex 设备索引
-   * @returns 设备句柄，0 表示失败
+   * @returns 设备句柄
+   * @throws {ZlgCanError} 打开设备失败时抛出异常
    */
   openDevice(deviceType: number, deviceIndex: number): number {
     const lib = this.ensureInitialized();
-    return lib.ZCAN_OpenDevice(deviceType, deviceIndex, 0);
+    const handle = lib.ZCAN_OpenDevice(deviceType, deviceIndex, 0);
+    if (handle === INVALID_DEVICE_HANDLE) {
+      throw new ZlgCanError('ZCAN_OpenDevice');
+    }
+    return handle;
   }
 
   /**
    * 关闭设备
    * @param deviceHandle 设备句柄
-   * @returns 是否成功
+   * @throws {ZlgCanError} 关闭设备失败时抛出异常
    */
-  closeDevice(deviceHandle: number): boolean {
+  closeDevice(deviceHandle: number): void {
     const lib = this.ensureInitialized();
-    return lib.ZCAN_CloseDevice(deviceHandle) === ZCAN_STATUS.OK;
+    if (lib.ZCAN_CloseDevice(deviceHandle) !== ZCAN_STATUS.OK) {
+      throw new ZlgCanError('ZCAN_CloseDevice');
+    }
   }
 
   /**
    * 获取设备信息
    * @param deviceHandle 设备句柄
-   * @returns 设备信息，失败返回 null
+   * @returns 设备信息
+   * @throws {ZlgCanError} 获取设备信息失败时抛出异常
    */
-  getDeviceInfo(deviceHandle: number): IZcanDeviceInfo | null {
+  getDeviceInfo(deviceHandle: number): IZcanDeviceInfo {
     const lib = this.ensureInitialized();
     const infoSize = koffi.sizeof(ZcanDeviceInfo);
     const buffer = Buffer.alloc(infoSize);
 
     const result = lib.ZCAN_GetDeviceInf(deviceHandle, buffer);
     if (result !== ZCAN_STATUS.OK) {
-      return null;
+      throw new ZlgCanError('ZCAN_GetDeviceInfo');
     }
 
     const info = koffi.decode(buffer, ZcanDeviceInfo);
@@ -135,7 +149,8 @@ export class ZlgCanDriver {
    * @param deviceHandle 设备句柄
    * @param canIndex 通道索引
    * @param config 通道配置
-   * @returns 通道句柄，0 表示失败
+   * @returns 通道句柄
+   * @throws {ZlgCanError} 初始化通道失败时抛出异常
    */
   initCAN(deviceHandle: number, canIndex: number, config: IZcanChannelInitConfig): number {
     const lib = this.ensureInitialized();
@@ -156,37 +171,47 @@ export class ZlgCanDriver {
       reserved: 0,
     });
 
-    return lib.ZCAN_InitCAN(deviceHandle, canIndex, buffer);
+    const handle = lib.ZCAN_InitCAN(deviceHandle, canIndex, buffer);
+    if (handle === INVALID_CHANNEL_HANDLE) {
+      throw new ZlgCanError('ZCAN_InitCAN');
+    }
+    return handle;
   }
 
   /**
    * 启动 CAN 通道
    * @param channelHandle 通道句柄
-   * @returns 是否成功
+   * @throws {ZlgCanError} 启动通道失败时抛出异常
    */
-  startCAN(channelHandle: number): boolean {
+  startCAN(channelHandle: number): void {
     const lib = this.ensureInitialized();
-    return lib.ZCAN_StartCAN(channelHandle) === ZCAN_STATUS.OK;
+    if (lib.ZCAN_StartCAN(channelHandle) !== ZCAN_STATUS.OK) {
+      throw new ZlgCanError('ZCAN_StartCAN');
+    }
   }
 
   /**
    * 重置 CAN 通道
    * @param channelHandle 通道句柄
-   * @returns 是否成功
+   * @throws {ZlgCanError} 重置通道失败时抛出异常
    */
-  resetCAN(channelHandle: number): boolean {
+  resetCAN(channelHandle: number): void {
     const lib = this.ensureInitialized();
-    return lib.ZCAN_ResetCAN(channelHandle) === ZCAN_STATUS.OK;
+    if (lib.ZCAN_ResetCAN(channelHandle) !== ZCAN_STATUS.OK) {
+      throw new ZlgCanError('ZCAN_ResetCAN');
+    }
   }
 
   /**
    * 清空通道缓冲区
    * @param channelHandle 通道句柄
-   * @returns 是否成功
+   * @throws {ZlgCanError} 清空缓冲区失败时抛出异常
    */
-  clearBuffer(channelHandle: number): boolean {
+  clearBuffer(channelHandle: number): void {
     const lib = this.ensureInitialized();
-    return lib.ZCAN_ClearBuffer(channelHandle) === ZCAN_STATUS.OK;
+    if (lib.ZCAN_ClearBuffer(channelHandle) !== ZCAN_STATUS.OK) {
+      throw new ZlgCanError('ZCAN_ClearBuffer');
+    }
   }
 
   /**
@@ -316,10 +341,10 @@ export class ZlgCanDriver {
    * 设置属性值
    * @param deviceHandle 设备句柄
    * @param path 属性路径
-   * @param value 属性值 (字符串、数值或对象)
-   * @returns 是否成功
+   * @param value 属性值 (字符串、数值或结构体对象)
+   * @throws {ZlgCanError} 设置属性失败时抛出异常
    */
-  setValue(deviceHandle: number, path: string, value: string | number | object): boolean {
+  setValue(deviceHandle: number, path: string, value: string | number | IZcanAutoTransmitObj | IZcanfdAutoTransmitObj | IZcanDynamicConfigData): void {
     const lib = this.ensureInitialized();
     let buffer: Buffer;
 
@@ -330,35 +355,177 @@ export class ZlgCanDriver {
       // 数值：转换为 uint32
       buffer = Buffer.alloc(4);
       buffer.writeUInt32LE(value, 0);
+    } else if (this.isDynamicConfigData(value)) {
+      // 动态配置数据
+      buffer = this.encodeDynamicConfigData(value);
+    } else if (this.isAutoTransmitObj(value)) {
+      // CAN 周期发送配置
+      buffer = this.encodeAutoTransmitObj(value);
+    } else if (this.isAutoTransmitFdObj(value)) {
+      // CANFD 周期发送配置
+      buffer = this.encodeAutoTransmitFdObj(value);
     } else {
-      // 对象：序列化为 JSON 字符串
-      buffer = Buffer.from(JSON.stringify(value) + '\0', 'utf8');
+      throw new ZlgCanError('ZCAN_SetValue', undefined, '不支持的对象类型');
     }
 
-    return lib.ZCAN_SetValue(deviceHandle, path, buffer) === ZCAN_STATUS.OK;
+    if (lib.ZCAN_SetValue(deviceHandle, path, buffer) !== ZCAN_STATUS.OK) {
+      throw new ZlgCanError('ZCAN_SetValue');
+    }
+  }
+
+  /**
+   * 判断是否为 CAN 周期发送配置对象
+   */
+  private isAutoTransmitObj(obj: object): obj is IZcanAutoTransmitObj {
+    const o = obj as IZcanAutoTransmitObj;
+    return (
+      typeof o.enable === 'number' &&
+      typeof o.index === 'number' &&
+      typeof o.interval === 'number' &&
+      typeof o.obj === 'object' &&
+      'frame' in o.obj &&
+      'can_dlc' in o.obj.frame
+    );
+  }
+
+  /**
+   * 判断是否为 CANFD 周期发送配置对象
+   */
+  private isAutoTransmitFdObj(obj: object): obj is IZcanfdAutoTransmitObj {
+    const o = obj as IZcanfdAutoTransmitObj;
+    return (
+      typeof o.enable === 'number' &&
+      typeof o.index === 'number' &&
+      typeof o.interval === 'number' &&
+      typeof o.obj === 'object' &&
+      'frame' in o.obj &&
+      'len' in o.obj.frame
+    );
+  }
+
+  /**
+   * 判断是否为动态配置数据对象
+   */
+  private isDynamicConfigData(obj: object): obj is IZcanDynamicConfigData {
+    const o = obj as IZcanDynamicConfigData;
+    return (
+      typeof o.key === 'string' &&
+      typeof o.value === 'string' &&
+      !('enable' in obj) &&
+      !('interval' in obj)
+    );
+  }
+
+  /**
+   * 编码动态配置数据对象
+   */
+  private encodeDynamicConfigData(value: IZcanDynamicConfigData): Buffer {
+    const size = koffi.sizeof(ZcanDynamicConfigData);
+    const buffer = Buffer.alloc(size);
+
+    // 将字符串转换为固定长度的字符数组 (64 bytes)
+    const keyBytes = Buffer.alloc(64);
+    const valueBytes = Buffer.alloc(64);
+    keyBytes.write(value.key, 'utf8');
+    valueBytes.write(value.value, 'utf8');
+
+    const data = {
+      key: Array.from(keyBytes),
+      value: Array.from(valueBytes),
+    };
+
+    koffi.encode(buffer, ZcanDynamicConfigData, data);
+    return buffer;
+  }
+
+  /**
+   * 编码 CAN 周期发送配置对象
+   */
+  private encodeAutoTransmitObj(value: IZcanAutoTransmitObj): Buffer {
+    const size = koffi.sizeof(ZcanAutoTransmitObj);
+    const buffer = Buffer.alloc(size);
+
+    const data = {
+      enable: value.enable,
+      index: value.index,
+      interval: value.interval,
+      obj: {
+        frame: {
+          can_id: value.obj.frame.can_id,
+          can_dlc: value.obj.frame.can_dlc,
+          __pad: value.obj.frame.__pad || 0,
+          __res0: value.obj.frame.__res0 || 0,
+          __res1: value.obj.frame.__res1 || 0,
+          data: Array.from(value.obj.frame.data).concat(new Array(8).fill(0)).slice(0, 8),
+        },
+        transmit_type: value.obj.transmit_type,
+      },
+    };
+
+    koffi.encode(buffer, ZcanAutoTransmitObj, data);
+    return buffer;
+  }
+
+  /**
+   * 编码 CANFD 周期发送配置对象
+   */
+  private encodeAutoTransmitFdObj(value: IZcanfdAutoTransmitObj): Buffer {
+    const size = koffi.sizeof(ZcanfdAutoTransmitObj);
+    const buffer = Buffer.alloc(size);
+
+    const data = {
+      enable: value.enable,
+      index: value.index,
+      interval: value.interval,
+      obj: {
+        frame: {
+          can_id: value.obj.frame.can_id,
+          len: value.obj.frame.len,
+          flags: value.obj.frame.flags || 0,
+          __res0: value.obj.frame.__res0 || 0,
+          __res1: value.obj.frame.__res1 || 0,
+          data: Array.from(value.obj.frame.data).concat(new Array(64).fill(0)).slice(0, 64),
+        },
+        transmit_type: value.obj.transmit_type,
+      },
+    };
+
+    koffi.encode(buffer, ZcanfdAutoTransmitObj, data);
+    return buffer;
   }
 
   /**
    * 获取属性值
    * @param deviceHandle 设备句柄
    * @param path 属性路径
-   * @returns 属性值，失败返回 null
+   * @returns 属性值
+   * @throws {ZlgCanError} 获取属性失败时抛出异常
    *
    * 注意：由于 GetValue 返回 void*，需要根据 path 确定返回类型
-   * 目前简化处理，尝试作为字符串读取
+   * 目前支持：
+   * - get_bus_usage: 返回 BusUsage 结构体
+   * - 其他: 尝试作为字符串读取
    */
-  getValue(deviceHandle: number, path: string): string | number | object | null {
+  getValue(deviceHandle: number, path: string): string | number | object {
     const lib = this.ensureInitialized();
     const ptr = lib.ZCAN_GetValue(deviceHandle, path);
 
     if (ptr === 0) {
-      return null;
+      throw new ZlgCanError('ZCAN_GetValue');
+    }
+
+    // 处理 get_bus_usage 路径，返回 BusUsage 结构体
+    if (path.includes('get_bus_usage')) {
+      try {
+        const busUsage = koffi.decode(ptr, BusUsage);
+        return busUsage as IBusUsage;
+      } catch {
+        // 解码失败，返回指针地址
+        return ptr;
+      }
     }
 
     // 尝试作为字符串读取
-    // 注意：这里需要根据实际的 path 来确定如何解析返回值
-    // 目前简化处理，返回指针地址
-    // 实际使用时需要根据具体的 path 进行类型转换
     try {
       const str = koffi.decode(ptr, 'str');
       return str;
